@@ -14,6 +14,8 @@ from skimage.feature import peak_local_max
 from skimage.segmentation import watershed
 use('TkAgg')
 from skimage.morphology import local_maxima, local_minima
+from skimage.measure import label
+from Ikosahdron import Icosahedron
 class MoleculeVisualizer:
     def __init__(self, smiles):
         self.smiles = smiles
@@ -176,7 +178,7 @@ class MoleculeVisualizer:
 
         plt.show()
 
-    def find_adjacent_bond(self):
+    def find_adjacent_bond(self, plotSegmentation=False):
         atoms_dict = self.atoms_dict
         bonds_dict = self.bonds_dict
         angle_matrix = self.calculate_bond_angles()
@@ -242,36 +244,69 @@ class MoleculeVisualizer:
                 #self.plot_distances_to_vector(distancetoBivector, x, y, z)
 
                 distancetoVecHalf = self.distance_to_point(vecHalf, x, y, z)
-                #self.plot_distances_to_vector(distancetoVecHalf, x, y, z)
+                self.plot_distances_to_vector(distancetoVecHalf, x, y, z)
 
                 stackedDist = np.stack((distancetoVec0, distancetoVec1, distancetoNegBivector, distancetoBivector, distancetoVecHalf))
                 minDist = np.min(stackedDist, axis=0)
-                #self.plot_distances_to_vector(minDist, x, y, z)
+                self.plot_distances_to_vector(minDist, x, y, z)
 
                 # Find local minima
                 minima_mask = local_minima(minDist, connectivity=1, allow_borders=True)
 
-                # Create a plot to display both the data matrix and the local minima
-                plt.figure(figsize=(12, 6))
+                # Convert boolean minima mask to integer markers for the watershed algorithm
+                markers = label(minima_mask)
+                print('markers:', markers)
 
-                # Plotting the original data matrix
-                plt.subplot(1, 2, 1)
-                plt.title('Original Matrix')
-                plt.imshow(minDist, cmap='viridis')
-                plt.colorbar()
+                # Apply the watershed algorithm
+                # Use the negative of the data_matrix as the 'surface' to 'flood'
+                labels = watershed(minDist, markers, mask=None)  # No specific mask, segment entire area
 
-                # Plotting the local minima on the data matrix
-                plt.subplot(1, 2, 2)
-                plt.title('Local Minima Highlighted')
-                # Overlay local minima on the original matrix for visualization
-                # Minima are marked in red
-                highlighted_minima = np.ma.masked_where(~minima_mask, minDist)
-                plt.imshow(minDist, cmap='viridis')
-                plt.imshow(highlighted_minima, cmap='autumn_r', interpolation='none')
-                plt.colorbar()
+                if plotSegmentation:
+                    # Create a plot to display both the data matrix and the local minima
+                    plt.figure(figsize=(18, 6))
 
-                plt.show()
-                a = 0
+                    # Plotting the original data matrix
+                    plt.subplot(1, 2, 1)
+                    plt.title('Original Matrix')
+                    plt.imshow(minDist, cmap='viridis')
+                    plt.colorbar()
+
+                    # Plotting the local minima on the data matrix
+                    plt.subplot(1, 2, 2)
+                    plt.title('Local Minima Highlighted')
+                    # Overlay local minima on the original matrix for visualization
+                    # Minima are marked in red
+                    highlighted_minima = np.ma.masked_where(~minima_mask, minDist)
+                    plt.imshow(minDist, cmap='viridis')
+                    plt.imshow(highlighted_minima, cmap='autumn_r', interpolation='none')
+                    plt.colorbar()
+
+                    # Plotting the watershed segmentation result
+                    plt.subplot(1, 3, 3)
+                    plt.title('Watershed Segmentation')
+                    plt.imshow(labels, cmap='nipy_spectral')
+                    plt.colorbar()
+                    plt.show()
+                    a = 0
+                    # Create labels for different regions
+                    # For simplicity, let's divide the sphere into 4 regions based on phi and theta
+
+                    fig = plt.figure(figsize=(8, 6))
+                    ax = fig.add_subplot(111, projection='3d')
+
+                    # Color by label
+                    ax.plot_surface(x, y, z, rstride=1, cstride=1, facecolors=plt.cm.nipy_spectral(labels / labels.max()),
+                                    shade=False)
+
+                    # Customize the view angle for better visualization
+                    ax.view_init(elev=30, azim=30)
+
+                    ax.set_xlim([-1, 1])
+                    ax.set_ylim([-1, 1])
+                    ax.set_zlim([-1, 1])
+                    ax.set_title("Labeled Sphere (Kugel) Surface")
+                    plt.show()
+
                 '''
                 print('norm of vec0:', np.linalg.norm(vec0))
                 print('norm of vec1:', np.linalg.norm(vec1))
