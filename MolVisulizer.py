@@ -5,6 +5,10 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
 import plotly.graph_objs as go
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import use
+use('TkAgg')
 class MoleculeVisualizer:
     def __init__(self, smiles):
         self.smiles = smiles
@@ -159,7 +163,61 @@ class MoleculeVisualizer:
                 idx1 = bonds_dict[b]['index']
                 angle = angle_matrix[idx0, idx1]
                 print(f"Angle between bonds: {angle:.2f} degrees")
+                atom_positions = np.array(atom['position'])
+                vec0 = np.array(bonds_dict[a]['normalized_vector'])
+                vec1 = np.array(bonds_dict[b]['normalized_vector'])
 
+                print(f"Vector 0: {vec0}")
+                print(f"Vector 1: {vec1}")
+                print(f"Position: {atom_positions}")
+                print(f"Angle: {angle}")
+                print(f"Atom: {key}")
+
+                # Erstellen eines 3D-Plots
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection='3d')
+
+                # Plotten der Vektoren
+                ax.quiver(0, 0, 0, vec0[0], vec0[1], vec0[2], color='r', label='vec0')
+                ax.quiver(0, 0, 0, vec1[0], vec1[1], vec1[2], color='g', label='vec1')
+                ax.scatter(0,0,0)
+                # Plotten der Atompositionen
+
+                # Einstellungen für den Plot
+                ax.set_xlabel('X')
+                ax.set_ylabel('Y')
+                ax.set_zlabel('Z')
+                ax.set_title('Vektoren und Atompositionen')
+                ax.legend()
+
+                plt.show()
+
+                print('norm of vec0:', np.linalg.norm(vec0))
+                print('norm of vec1:', np.linalg.norm(vec1))
+                a = 0
+    def calculate_bisector_vector(self, atom_index):
+        # Finde die normierten Vektoren der Bindungen, die an diesem Atom ansetzen
+        connected_bonds = [bond for bond in self.bonds if atom_index in bond.GetBeginAtomIdx() or atom_index in bond.GetEndAtomIdx()]
+
+        if len(connected_bonds) != 2:
+            raise ValueError("Die Berechnung der Winkelhalbierenden erfordert genau zwei Bindungen.")
+
+        bond_vectors = []
+        for bond in connected_bonds:
+            # Bestimme den Vektor der Bindung
+            start_atom_idx = bond.GetBeginAtomIdx()
+            end_atom_idx = bond.GetEndAtomIdx()
+            start_position = np.array(self.positions[start_atom_idx])
+            end_position = np.array(self.positions[end_atom_idx])
+            bond_vector = end_position - start_position
+            normalized_vector = bond_vector / np.linalg.norm(bond_vector)
+            bond_vectors.append(normalized_vector)
+
+        # Addiere die beiden normierten Vektoren, um den Vektor der Winkelhalbierenden zu erhalten
+        bisector_vector = np.add(bond_vectors[0], bond_vectors[1])
+        bisector_vector_normalized = bisector_vector / np.linalg.norm(bisector_vector)
+
+        return bisector_vector_normalized.tolist()
 
     def create_3d_plot(self):
         atoms_dict, bonds_dict = self.generate_dicts()
@@ -178,7 +236,7 @@ class MoleculeVisualizer:
             z=[info['position'][2]],
             mode='markers+text',
             marker=dict(size=info['size'], color=info['color'], opacity=0.8),
-            text=f"{info['symbol']} ({info['hybridization']})",
+            text=f"{info['symbol']} ({info['hybridization']}) {info['index']}",
             textposition='middle center',
             textfont=dict(size=16, color='black'),
             name=f"Atom {info['index'] + 1}"
@@ -189,6 +247,7 @@ class MoleculeVisualizer:
             y=[info['start_position'][1], info['end_position'][1], None],
             z=[info['start_position'][2], info['end_position'][2], None],
             mode='lines',
+            text=f"{info['bond_type']} (idx: {info['index']})",
             line=dict(color=info['color'], width=info['width']),
             name=f"{info['start_symbol']}-{info['end_symbol']} ({info['bond_type']})"
         ) for info in bonds_dict.values()]
