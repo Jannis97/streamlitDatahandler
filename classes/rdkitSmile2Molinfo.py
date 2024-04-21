@@ -1,5 +1,8 @@
 from rdkit import Chem
+from rdkit.Chem import Draw
 from rdkit.Chem import Descriptors
+from PIL import Image
+import io
 
 class rdkitSmile2Molinfo:
     def __init__(self, smiles):
@@ -31,3 +34,10 @@ class rdkitSmile2Molinfo:
             "Number of Hydrogen Bond Donors": self.get_num_h_donors(),
             "Number of Hydrogen Bond Acceptors": self.get_num_h_acceptors()
         }
+
+    def draw_molecule(self):
+        img = Draw.MolToImage(self.mol)
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format='PNG')
+        return img_byte_arr.getvalue()
+
