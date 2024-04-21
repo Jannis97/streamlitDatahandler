@@ -1,0 +1,52 @@
+@startuml
+entity "Molecule" as Molecule {
+    + id : int
+    --
+    smiles : varchar
+    molecular_formula : varchar
+    molecular_weight : float
+    atom_count : int
+    bond_count : int
+    logP : float
+    aromatic_rings : int
+    chirality : varchar
+    graph : blob
+}
+
+entity "Atom" as Atom {
+    + id : int
+    + molecule_id : int
+    --
+    atom_type : varchar
+    atomic_number : int
+    charge : int
+    x : float
+    y : float
+    z : float
+}
+
+entity "Bond" as Bond {
+    + id : int
+    + molecule_id : int
+    --
+    bond_type : varchar
+    atom1_id : int
+    atom2_id : int
+}
+
+entity "AdjacencyMatrix" as AdjacencyMatrix {
+    + molecule_id : int
+    + atom1_id : int
+    + atom2_id : int
+    --
+    bond_present : boolean
+}
+
+Molecule ||--o{ Atom : contains
+Molecule ||--o{ Bond : contains
+Molecule ||--o{ AdjacencyMatrix : links
+
+Atom }o--|| Atom : "Adjacency"
+Bond }|-- Atom : connects
+
+@enduml
