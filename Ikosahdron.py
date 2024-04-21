@@ -3,34 +3,28 @@ import plotly.graph_objs as go
 
 class Icosahedron:
     def __init__(self):
-        # Golden ratio
+        # Goldenes Verhältnis
         phi = (1 + np.sqrt(5)) / 2
 
-        # Vertices of a regular icosahedron
+        # Eckpunkte eines regulären Ikosaeders
         self.vertices = np.array([
             [-1, phi, 0], [1, phi, 0], [-1, -phi, 0], [1, -phi, 0],
             [0, -1, phi], [0, 1, phi], [0, -1, -phi], [0, 1, -phi],
             [phi, 0, -1], [phi, 0, 1], [-phi, 0, -1], [-phi, 0, 1]
         ])
 
-        # Scale vertices to unit length
+        # Eckpunkte auf Einheitslänge skalieren
         self.vertices /= np.linalg.norm(self.vertices[0])
 
-        # Icosahedron faces
+        # Flächen des Ikosaeders
         self.faces = [
             [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
             [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
             [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
             [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]
         ]
-        u = np.linspace(0, 2 * np.pi, 100)
-        v = np.linspace(0, np.pi, 100)
-        x = np.outer(np.cos(u), np.sin(v))
-        y = np.outer(np.sin(u), np.sin(v))
-        z = np.outer(np.ones(np.size(u)), np.cos(v))
-        distancetoVec0 = self.distance_to_point(vec0, x, y, z)
 
-    def distance_to_point(self,point, x, y, z):
+    def distance_to_point(self, point, x, y, z):
         """
         Berechnet die Distanz zwischen einem Punkt und einem anderen Punkt.
 
@@ -48,29 +42,32 @@ class Icosahedron:
         distances = np.sqrt((x - x_point) ** 2 + (y - y_point) ** 2 + (z - z_point) ** 2)
 
         return distances
-    # Hier kommt der vorhandene Code hin
-    def plot_distances_to_vector(self, distances, x, y, z):
-        # Erstellen eines 3D-Plots für die Distanzen zu dem Vektor
-        fig = go.Figure()
 
-        # Trigonalpyramiden erstellen, um die Distanzen zu visualisieren
-        for i in range(len(distances)):
-            trace = go.Mesh3d(x=x[i], y=y[i], z=z[i], color='cyan', opacity=0.8)
-            fig.add_trace(trace)
+    def plot_distances_to_vector(self, distances):
+        # Erstelle Mesh für Oberfläche mit den Distanzen zu dem Vektor
+        vertices = self.vertices.tolist()
+        faces = []
+        for face in self.faces:
+            faces.append([face[0], face[1], face[2]])
 
-        # Einstellungen für den Plot
-        fig.update_layout(
+        mesh = go.Mesh3d(x=[v[0] for v in vertices], y=[v[1] for v in vertices], z=[v[2] for v in vertices],
+                         i=[f[0] for f in faces], j=[f[1] for f in faces], k=[f[2] for f in faces],
+                         intensity=distances, colorscale='Viridis', flatshading=True)
+
+        # Layout des Plots
+        layout = go.Layout(
+            title='Surface Distance from Nodes',
             scene=dict(
                 xaxis=dict(title='X'),
                 yaxis=dict(title='Y'),
                 zaxis=dict(title='Z'),
-            ),
-            title=f'Distances to Vector',
-            margin=dict(l=0, r=0, t=40, b=0)
+            )
         )
 
         # Plot anzeigen
+        fig = go.Figure(data=[mesh], layout=layout)
         fig.show()
+
 
 def plot_3d_graph(vertices, faces):
     # Create a list of vertex coordinates for each face
@@ -100,4 +97,9 @@ def plot_3d_graph(vertices, faces):
 
 if __name__ == '__main__':
     icosahedron = Icosahedron()
-    plot_3d_graph(icosahedron.vertices, icosahedron.faces)
+    # Annahme: Hier werden die Distanzen zu einem bestimmten Punkt berechnet
+    # und dann zur Visualisierung übergeben
+    # Zum Beispiel:
+    distances = 0.5 * np.random.rand(len(icosahedron.vertices))  # Zufällige Distanzen
+    icosahedron.plot_distances_to_vector(distances)
+
