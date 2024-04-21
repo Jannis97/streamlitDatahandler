@@ -4,10 +4,12 @@ from rdkit.Chem import AllChem
 import numpy as np
 import plotly.graph_objs as go
 
-
 def generate_3d_graph(smiles):
     # Konvertiere den SMILES-String in ein RDKit-Molekül
     mol = Chem.MolFromSmiles(smiles)
+
+    # Füge Wasserstoffatome hinzu
+    mol = Chem.AddHs(mol)
 
     # Generiere die 3D-Konformation des Moleküls
     AllChem.EmbedMolecule(mol, AllChem.ETKDG())
@@ -21,6 +23,9 @@ def generate_3d_graph(smiles):
     # Extrahiere die Atomsymbole
     symbols = [atom.GetSymbol() for atom in mol.GetAtoms()]
 
+    # Extrahiere die Anzahl der Valenzelektronen für jedes Atom
+    valence_electrons = [atom.GetTotalValence() for atom in mol.GetAtoms()]
+
     # Extrahiere die x-, y- und z-Koordinaten der Atome
     x_coords = [positions[i][0] for i in range(len(positions))]
     y_coords = [positions[i][1] for i in range(len(positions))]
@@ -29,12 +34,22 @@ def generate_3d_graph(smiles):
     # Erstelle eine Liste von Traces für die Atome
     atom_traces = []
     for i in range(len(x_coords)):
+        color = 'black'
+        if symbols[i] == 'C':
+            color = 'black'
+        elif symbols[i] == 'H':
+            color = 'blue'
+        elif symbols[i] == 'N':
+            color = 'green'
+        elif symbols[i] == 'O':
+            color = 'red'
+        size = valence_electrons[i] * 5  # Die Größe der Marker basiert auf der Anzahl der Valenzelektronen
         atom_trace = go.Scatter3d(
             x=[x_coords[i]],
             y=[y_coords[i]],
             z=[z_coords[i]],
             mode='markers+text',
-            marker=dict(size=20, color='blue', opacity=0.8),
+            marker=dict(size=size, color=color, opacity=0.8),
             text=symbols[i],
             textposition='middle center',
             textfont=dict(size=16, color='black'),
@@ -56,7 +71,7 @@ def generate_3d_graph(smiles):
             y=[y_start, y_end, None],
             z=[z_start, z_end, None],
             mode='lines',
-            line=dict(color='red', width=5),
+            line=dict(color='gray', width=5),
             name=f'Bond {start_atom_idx + 1}-{end_atom_idx + 1}'
         )
         bond_traces.append(bond_trace)
