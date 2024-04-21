@@ -1,54 +1,97 @@
 import streamlit as st
 from rdkit import Chem
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.pyplot as plt
+from rdkit.Chem import AllChem
+import numpy as np
+import plotly.graph_objs as go
 
-def generate_molecule(smiles):
+
+def generate_3d_graph(smiles):
+    # Konvertiere den SMILES-String in ein RDKit-Molekül
     mol = Chem.MolFromSmiles(smiles)
-    return mol
 
-def generate_3d_graph(mol):
-    try:
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+    # Generiere die 3D-Konformation des Moleküls
+    AllChem.EmbedMolecule(mol, AllChem.ETKDG())
 
-        for bond in mol.GetBonds():
-            start = bond.GetBeginAtom().GetIdx()
-            end = bond.GetEndAtom().GetIdx()
-            ax.plot([mol.GetConformer().GetAtomPosition(start)[0], mol.GetConformer().GetAtomPosition(end)[0]],
-                    [mol.GetConformer().GetAtomPosition(start)[1], mol.GetConformer().GetAtomPosition(end)[1]],
-                    [mol.GetConformer().GetAtomPosition(start)[2], mol.GetConformer().GetAtomPosition(end)[2]], color='black')
+    # Extrahiere die Atompositionen aus der konformierten Molekülstruktur
+    positions = mol.GetConformer().GetPositions()
 
-        ax.scatter([mol.GetConformer().GetAtomPosition(i)[0] for i in range(mol.GetNumAtoms())],
-                   [mol.GetConformer().GetAtomPosition(i)[1] for i in range(mol.GetNumAtoms())],
-                   [mol.GetConformer().GetAtomPosition(i)[2] for i in range(mol.GetNumAtoms())], color='b')
+    # Extrahiere die Bindungen zwischen den Atomen
+    bonds = mol.GetBonds()
 
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
+    # Extrahiere die Atomsymbole
+    symbols = [atom.GetSymbol() for atom in mol.GetAtoms()]
 
-        ax.set_title('3D Molecule Graph')
+    # Extrahiere die x-, y- und z-Koordinaten der Atome
+    x_coords = [positions[i][0] for i in range(len(positions))]
+    y_coords = [positions[i][1] for i in range(len(positions))]
+    z_coords = [positions[i][2] for i in range(len(positions))]
 
-        st.pyplot(fig)
-    except ValueError as e:
-        st.error(f"Error generating 3D graph: {str(e)}")
+    # Erstelle eine Liste von Traces für die Atome
+    atom_traces = []
+    for i in range(len(x_coords)):
+        atom_trace = go.Scatter3d(
+            x=[x_coords[i]],
+            y=[y_coords[i]],
+            z=[z_coords[i]],
+            mode='markers+text',
+            marker=dict(size=20, color='blue', opacity=0.8),
+            text=symbols[i],
+            textposition='middle center',
+            textfont=dict(size=16, color='black'),
+            name=f'Atom {i + 1}'
+        )
+        atom_traces.append(atom_trace)
+
+    # Erstelle eine Liste von Traces für die Bindungen
+    bond_traces = []
+    for bond in bonds:
+        start_atom_idx = bond.GetBeginAtomIdx()
+        end_atom_idx = bond.GetEndAtomIdx()
+        start_pos = positions[start_atom_idx]
+        end_pos = positions[end_atom_idx]
+        x_start, y_start, z_start = start_pos
+        x_end, y_end, z_end = end_pos
+        bond_trace = go.Scatter3d(
+            x=[x_start, x_end, None],
+            y=[y_start, y_end, None],
+            z=[z_start, z_end, None],
+            mode='lines',
+            line=dict(color='red', width=5),
+            name=f'Bond {start_atom_idx + 1}-{end_atom_idx + 1}'
+        )
+        bond_traces.append(bond_trace)
+
+    # Erstelle das 3D-Figurenlayout
+    layout = go.Layout(
+        scene=dict(
+            xaxis=dict(title='X'),
+            yaxis=dict(title='Y'),
+            zaxis=dict(title='Z')
+        ),
+        margin=dict(l=0, r=0, b=0, t=0),
+        showlegend=True
+    )
+
+    # Erstelle das Plotly-Figurenobjekt
+    fig = go.Figure(data=atom_traces + bond_traces, layout=layout)
+
+    # Zeige das interaktive 3D-Plot mit Plotly an
+    st.plotly_chart(fig)
 
 
 def main():
-    st.title("3D Molecule Graph Generator")
+    st.title('Interactive 3D Molecule Visualization')
 
     # Eingabefeld für den SMILES-String
-    smiles_input = st.text_input("Enter SMILES String", "")
+    smiles = st.text_input('Enter SMILES string')
 
-    if smiles_input:
-        # Generiere das Molekül aus dem SMILES-String
-        mol = generate_molecule(smiles_input)
+    # Button zum Generieren der interaktiven 3D-Visualisierung
+    if st.button('Generate Interactive 3D Visualization'):
+        try:
+            generate_3d_graph(smiles)
+        except Exception as e:
+            st.error(f'Error generating interactive 3D visualization: {str(e)}')
 
-        if mol:
-            # Generiere den 3D-Graphen des Moleküls
-            generate_3d_graph(mol)
-        else:
-            st.error("Invalid SMILES string. Please enter a valid SMILES.")
 
 if __name__ == "__main__":
     main()
