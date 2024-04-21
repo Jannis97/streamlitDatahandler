@@ -8,7 +8,12 @@ import plotly.graph_objs as go
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import use
+import matplotlib.pyplot as plt
+from scipy import ndimage as ndi
+from skimage.feature import peak_local_max
+from skimage.segmentation import watershed
 use('TkAgg')
+from skimage.morphology import local_maxima, local_minima
 class MoleculeVisualizer:
     def __init__(self, smiles):
         self.smiles = smiles
@@ -131,6 +136,46 @@ class MoleculeVisualizer:
                         angles_mat[idx1, idx0] = angle
         return angles_mat
 
+    def distance_to_point(self,point, x, y, z):
+        """
+        Berechnet die Distanz zwischen einem Punkt und einem anderen Punkt.
+
+        Args:
+        point: Tuple oder Liste mit den Koordinaten des Punkts (x, y, z).
+        x, y, z: Arrays mit den Koordinaten der Punkte, zu denen die Distanz berechnet werden soll.
+
+        Returns:
+        distances: Array mit den berechneten Distanzen.
+        """
+        # Extrahiere die Koordinaten des Punkts
+        x_point, y_point, z_point = point
+
+        # Berechne die Distanz zu jedem Punkt
+        distances = np.sqrt((x - x_point) ** 2 + (y - y_point) ** 2 + (z - z_point) ** 2)
+
+        return distances
+
+    def plot_distances_to_vector(self, distances, x, y, z):
+
+        # Erstellen eines 3D-Plots für die Distanzen zu dem Vektor
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Plot der Oberfläche mit den Distanzen zu dem Vektor
+        surf = ax.plot_surface(x, y, z, facecolors=plt.cm.coolwarm(distances), alpha=0.8)
+
+        # Einstellungen für den Plot
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_title(f'Distances to {3}')
+
+        # Hinzufügen einer Farbleiste (Colorbar)
+        cbar = plt.colorbar(surf)
+        cbar.set_label('Distance to vector')
+
+        plt.show()
+
     def find_adjacent_bond(self):
         atoms_dict = self.atoms_dict
         bonds_dict = self.bonds_dict
@@ -167,21 +212,97 @@ class MoleculeVisualizer:
                 vec0 = np.array(bonds_dict[a]['normalized_vector'])
                 vec1 = np.array(bonds_dict[b]['normalized_vector'])
 
+                vecHalf = -(vec0 + vec1) / 2
+
+                # Berechnung des Bivektors als Kreuzprodukt
+                bivector = np.cross(vec0, vec1)
+                bivector /= np.linalg.norm(bivector)
+                neg_bivector = -bivector
                 print(f"Vector 0: {vec0}")
                 print(f"Vector 1: {vec1}")
                 print(f"Position: {atom_positions}")
                 print(f"Angle: {angle}")
                 print(f"Atom: {key}")
+                u = np.linspace(0, 2 * np.pi, 100)
+                v = np.linspace(0, np.pi, 100)
+                x = np.outer(np.cos(u), np.sin(v))
+                y = np.outer(np.sin(u), np.sin(v))
+                z = np.outer(np.ones(np.size(u)), np.cos(v))
+
+                distancetoVec0 = self.distance_to_point(vec0, x, y, z)
+                #self.plot_distances_to_vector(distancetoVec0, x, y, z)
+
+                distancetoVec1 = self.distance_to_point(vec1, x, y, z)
+                #self.plot_distances_to_vector(distancetoVec1, x, y, z)
+
+                distancetoNegBivector = self.distance_to_point(neg_bivector, x, y, z)
+                #self.plot_distances_to_vector(distancetoNegBivector, x, y, z)
+
+                distancetoBivector = self.distance_to_point(bivector, x, y, z)
+                #self.plot_distances_to_vector(distancetoBivector, x, y, z)
+
+                distancetoVecHalf = self.distance_to_point(vecHalf, x, y, z)
+                #self.plot_distances_to_vector(distancetoVecHalf, x, y, z)
+
+                stackedDist = np.stack((distancetoVec0, distancetoVec1, distancetoNegBivector, distancetoBivector, distancetoVecHalf))
+                minDist = np.min(stackedDist, axis=0)
+                #self.plot_distances_to_vector(minDist, x, y, z)
+
+                # Find local minima
+                minima_mask = local_minima(minDist, connectivity=1, allow_borders=True)
+
+                # Create a plot to display both the data matrix and the local minima
+                plt.figure(figsize=(12, 6))
+
+                # Plotting the original data matrix
+                plt.subplot(1, 2, 1)
+                plt.title('Original Matrix')
+                plt.imshow(minDist, cmap='viridis')
+                plt.colorbar()
+
+                # Plotting the local minima on the data matrix
+                plt.subplot(1, 2, 2)
+                plt.title('Local Minima Highlighted')
+                # Overlay local minima on the original matrix for visualization
+                # Minima are marked in red
+                highlighted_minima = np.ma.masked_where(~minima_mask, minDist)
+                plt.imshow(minDist, cmap='viridis')
+                plt.imshow(highlighted_minima, cmap='autumn_r', interpolation='none')
+                plt.colorbar()
+
+                plt.show()
+                a = 0
+                '''
+                print('norm of vec0:', np.linalg.norm(vec0))
+                print('norm of vec1:', np.linalg.norm(vec1))
+
+                dist_to_vec0 = np.linalg.norm(np.array([x, y, z]) - vec0.reshape(-1, 1, 1), axis=0)
+                dist_to_vec1 = np.linalg.norm(np.array([x, y, z]) - vec1.reshape(-1, 1, 1), axis=0)
+                dist_to_neg_bivector = np.linalg.norm(np.array([x, y, z]) - neg_bivector.reshape(-1, 1, 1), axis=0)
+                
+                # Bestimmung der maximalen Punkte basierend auf der Entfernung
+                max_points_mask = np.logical_and(dist_to_vec0 == np.max(dist_to_vec0),
+                                                 dist_to_vec1 == np.max(dist_to_vec1))
+
+                # Färben der Oberfläche basierend auf der Nähe der Punkte
+                min_dist = np.minimum(dist_to_vec0, dist_to_vec1)
+                max_dist = np.maximum(dist_to_vec0, dist_to_vec1)
+                color_array = (min_dist / max_dist)
 
                 # Erstellen eines 3D-Plots
                 fig = plt.figure()
                 ax = fig.add_subplot(111, projection='3d')
 
-                # Plotten der Vektoren
-                ax.quiver(0, 0, 0, vec0[0], vec0[1], vec0[2], color='r', label='vec0')
-                ax.quiver(0, 0, 0, vec1[0], vec1[1], vec1[2], color='g', label='vec1')
-                ax.scatter(0,0,0)
-                # Plotten der Atompositionen
+                # Plot der Oberfläche mit den entsprechenden Farben
+                surf = ax.plot_surface(x, y, z, facecolors=plt.cm.coolwarm(color_array), alpha=0.8)
+
+                # Markieren der maximalen Punkte auf der Oberfläche
+                max_points = np.where(max_points_mask)
+                ax.scatter(x[max_points], y[max_points], z[max_points], color='black', s=50, label='Maximal Points')
+
+                # Erstellen und Hinzufügen einer Farbleiste (Colorbar)
+                cbar = plt.colorbar(surf)
+                cbar.set_label('Color based on proximity to vectors')
 
                 # Einstellungen für den Plot
                 ax.set_xlabel('X')
@@ -191,10 +312,8 @@ class MoleculeVisualizer:
                 ax.legend()
 
                 plt.show()
-
-                print('norm of vec0:', np.linalg.norm(vec0))
-                print('norm of vec1:', np.linalg.norm(vec1))
                 a = 0
+                '''
     def calculate_bisector_vector(self, atom_index):
         # Finde die normierten Vektoren der Bindungen, die an diesem Atom ansetzen
         connected_bonds = [bond for bond in self.bonds if atom_index in bond.GetBeginAtomIdx() or atom_index in bond.GetEndAtomIdx()]
