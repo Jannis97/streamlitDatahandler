@@ -2,7 +2,6 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 import plotly.graph_objs as go
 
-
 class MoleculeVisualizer:
     def __init__(self, smiles):
         self.smiles = smiles
@@ -47,21 +46,16 @@ class MoleculeVisualizer:
         return atoms_dict, bonds_dict
 
     def analyze_molecule(self):
-        smiles = self.smiles
-        mol = Chem.MolFromSmiles(smiles)
-        mol = Chem.AddHs(mol)  # Füge Wasserstoffe hinzu, um vollständige Informationen zu erhalten
-
-        # Analyse der Hybridisierung der Atome
+        # Analyse der Hybridisierung der Atome und Bindungstypen
         atom_hybridization = {}
-        for atom in mol.GetAtoms():
+        bond_types = {}
+        for atom in self.mol.GetAtoms():
             atom_hybridization[atom.GetIdx()] = {
                 'symbol': atom.GetSymbol(),
                 'hybridization': atom.GetHybridization().name
             }
 
-        # Analyse der Bindungstypen
-        bond_types = {}
-        for bond in mol.GetBonds():
+        for bond in self.mol.GetBonds():
             bond_types[(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())] = {
                 'start_symbol': bond.GetBeginAtom().GetSymbol(),
                 'end_symbol': bond.GetEndAtom().GetSymbol(),
@@ -70,37 +64,82 @@ class MoleculeVisualizer:
 
         return atom_hybridization, bond_types
 
+    def combine_dicts(self, atoms_dict, atom_hybridization, bonds_dict, bond_types):
+        # Aktualisiere die Dictionaries mit zusätzlichen Analyseinformationen
+        for idx, atom in atom_hybridization.items():
+            if idx in atoms_dict:
+                atoms_dict[idx].update(atom)
+
+        for idx, bond in bond_types.items():
+            if idx in bonds_dict:
+                bonds_dict[idx].update(bond)
+
+        return atoms_dict, bonds_dict
+
+    def find_adjacent_bond(self):
+        atoms_dict = self.atoms_dict
+        bonds_dict = self.bonds_dict
+
+
+        for key in atoms_dict.keys():
+            index = atoms_dict[key]['index']
+            bondsCounter = 0
+            adjBonds = {}
+            for (begin, end) in bonds_dict.keys():
+                if begin == index or end == index:
+                    print(index, begin, end)
+                    adjBonds[bondsCounter] = (begin, end)
+                    bondsCounter += 1
+            atoms_dict[key].update(adjBonds)
+
+        for key, atom in atoms_dict.items():
+            # Zähle die Anzahl der Bindungen für jedes Atom
+            bond_count = sum(1 for (begin, end) in bonds_dict if begin == key or end == key)
+            hybridization = atom['hybridization']
+
+            symbol = atom['symbol']
+            if hybridization == 'SP3' and bond_count == 2:
+                # ether
+                print(f"Atom {symbol}{key} mit SP3 Hybridisierung hat genau 2 Bindungen")
+
+
+                # Führe spezifische Aktionen hier aus
+            elif hybridization == 'SP2' and bond_count == 1:
+                print(f"Atom {key} mit SP2 Hybridisierung hat genau 1 Bindung")
+                # Führe spezifische Aktionen hier aus
+
+        #case depented action
     def create_3d_plot(self):
         atoms_dict, bonds_dict = self.generate_dicts()
         atom_hybridization, bond_types = self.analyze_molecule()
-        # Erstelle Traces für Atome
-        atom_traces = []
-        for atom_id, atom_info in atoms_dict.items():
-            atom_trace = go.Scatter3d(
-                x=[atom_info['position'][0]],
-                y=[atom_info['position'][1]],
-                z=[atom_info['position'][2]],
-                mode='markers+text',
-                marker=dict(size=atom_info['size'], color=atom_info['color'], opacity=0.8),
-                text=atom_info['symbol'],
-                textposition='middle center',
-                textfont=dict(size=16, color='black'),
-                name=f'Atom {atom_id + 1}'
-            )
-            atom_traces.append(atom_trace)
 
-        # Erstelle Traces für Bindungen
-        bond_traces = []
-        for (start_atom_idx, end_atom_idx), bond_info in bonds_dict.items():
-            bond_trace = go.Scatter3d(
-                x=[bond_info['start_position'][0], bond_info['end_position'][0], None],
-                y=[bond_info['start_position'][1], bond_info['end_position'][1], None],
-                z=[bond_info['start_position'][2], bond_info['end_position'][2], None],
-                mode='lines',
-                line=dict(color=bond_info['color'], width=bond_info['width']),
-                name=f'Bond {start_atom_idx + 1}-{end_atom_idx + 1}'
-            )
-            bond_traces.append(bond_trace)
+        atoms_dict, bonds_dict = self.combine_dicts(atoms_dict, atom_hybridization, bonds_dict, bond_types)
+        self.atoms_dict = atoms_dict
+        self.bonds_dict = bonds_dict
+
+        self.find_adjacent_bond()
+
+        # Erstelle Traces für Atome und Bindungen
+        atom_traces = [go.Scatter3d(
+            x=[info['position'][0]],
+            y=[info['position'][1]],
+            z=[info['position'][2]],
+            mode='markers+text',
+            marker=dict(size=info['size'], color=info['color'], opacity=0.8),
+            text=f"{info['symbol']} ({info['hybridization']})",
+            textposition='middle center',
+            textfont=dict(size=16, color='black'),
+            name=f"Atom {info['index'] + 1}"
+        ) for info in atoms_dict.values()]
+
+        bond_traces = [go.Scatter3d(
+            x=[info['start_position'][0], info['end_position'][0], None],
+            y=[info['start_position'][1], info['end_position'][1], None],
+            z=[info['start_position'][2], info['end_position'][2], None],
+            mode='lines',
+            line=dict(color=info['color'], width=info['width']),
+            name=f"{info['start_symbol']}-{info['end_symbol']} ({info['bond_type']})"
+        ) for info in bonds_dict.values()]
 
         # Erstelle das Plotly-Figurenobjekt
         layout = go.Layout(
@@ -114,7 +153,6 @@ class MoleculeVisualizer:
         )
         fig = go.Figure(data=atom_traces + bond_traces, layout=layout)
         fig.show()
-
 
 # Beispiel zur Verwendung der Klasse
 smiles_string = "CCO"  # Beispiel SMILES für Ethanol
