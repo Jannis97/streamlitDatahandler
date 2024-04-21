@@ -2,14 +2,6 @@ import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine
 
-# Datenbankverbindung herstellen
-db_path = "pages/chembl_34.db"
-engine = create_engine(f'sqlite:///{db_path}')
-
-import streamlit as st
-import pandas as pd
-from sqlalchemy import create_engine
-
 def main():
     st.title('ChemBL Table Viewer')
 
@@ -30,11 +22,14 @@ def main():
     # Verbindung zur SQLite-Datenbank
     engine = create_engine('sqlite:///pages/chembl_34.db')
 
-    # SQL-Abfrage zur Auswahl der ersten 501 Zeilen der ausgewählten Tabelle
+    # Slider zur Auswahl des Limits
+    limit = st.slider("Select the number of rows to display", 1, 1000, 501)
+
+    # SQL-Abfrage zur Auswahl der ersten 'limit' Zeilen der ausgewählten Tabelle
     query = f'''
     SELECT *
     FROM {selected_table}
-    LIMIT 501
+    LIMIT {limit}
     '''
 
     # Ausführen der SQL-Abfrage und Abrufen der Ergebnisse als DataFrame
@@ -42,6 +37,13 @@ def main():
 
     # Anzeigen des DataFrames in der Streamlit-App
     st.dataframe(results_df)
+
+    # Drucken der Spaltennamen
+    st.write("Column Names:")
+    st.write(results_df.columns.tolist())
+
+    # Anzeigen der Anzahl der Zeilen
+    st.write(f"Number of Rows: {results_df.shape[0]}")
 
 if __name__ == "__main__":
     main()
