@@ -7,9 +7,9 @@ from graphviz import Digraph
 from rdkit import Chem
 from rdkit import RDLogger
 import sqlite3
-
+from molvs import standardize_smiles
 # Deactivate RDKit warnings
-RDLogger.DisableLog('rdApp.*')
+#RDLogger.DisableLog('rdApp.*')
 
 class TreeNode:
     def __init__(self, name, value=None, shape=None, dtype=None):
@@ -119,23 +119,37 @@ class TorchGeometricDatasets:
             os.makedirs(dataset_dir)
         return dataset_dir
 
-    def _process_sample(self, index_sample):
+    def _process_sample(self, index_sample, doPrint=False):
         index, sample = index_sample
         sample_dict = {}
+        failed = False
+        oldSmile = None
         for key, value in sample.items():
             if key == 'smiles':  # Assume the key for SMILES is 'smiles'
                 try:
+                    oldSmile = value
+
+                    if doPrint:
+                        print(f"oldSmile: {oldSmile}")
+                    value = standardize_smiles(value)
                     mol = Chem.MolFromSmiles(value)
+
                     if mol is not None:
                         canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
-                        sample_dict[key] = canonical_smiles
+                        sample_dict[key] = value
+                        sample_dict['canonical_smiles'] = canonical_smiles
+
                     else:
                         sample_dict[key] = "Invalid SMILES"
+
                 except Exception as e:
-                    print(f"Error processing SMILES: {e}")
-                    print(f"Sample index: {index}")
-                    print(f"Sample SMILES: {value}")
-                    print(f"canonical_smiles: {canonical_smiles}")
+                    failed = True
+                    if doPrint:
+                        print(f"Error processing SMILES: {e}")
+                        print(f"Sample index: {index}")
+                        print(f"Sample SMILES: {value}")
+                        print(f"canonical_smiles: {canonical_smiles}")
+
                     if 'Explicit valence' in str(e):
                         sample_dict[key] = "Invalid SMILES"
                     else:
@@ -143,17 +157,31 @@ class TorchGeometricDatasets:
             else:
                 sample_dict[key] = value
 
-
-        return index, sample_dict
+        sample_dict['has_failed'] = failed
+        return index, sample_dict, failed, oldSmile
 
     def dataset_to_dict(self, dataset):
         print("Funktion: TorchGeometricDatasets.dataset_to_dict")
         data_dict = {}
         num_samples = len(dataset)
 
+        nSuccess = 0
+        nFail = 0
+        smilesSuccess = []
+        smilesFail = []
         for i in tqdm(range(num_samples), desc="Converting dataset to dict"):
-            index, sample_dict = self._process_sample((i, dataset[i]))
+            index, sample_dict, failed, oldSmile= self._process_sample((i, dataset[i]))
             data_dict[index] = sample_dict
+
+            if failed:
+                nFail += 1
+                smilesFail.append(sample_dict['smiles'])
+            else:
+                nSuccess += 1
+                smilesSuccess.append(sample_dict['smiles'])
+
+        print(f"failed SMILES: {smilesFail}")
+        print(f"nSuccess {nSuccess} SMILES processed successfully, failed {nFail} SMILES processing")
 
         return data_dict
 
@@ -172,6 +200,7 @@ class TorchGeometricDatasets:
         key = list(data_dict.keys())[0]
         dictionary = data_dict[key]
         self.DictVisulizer.dict_to_graph(dictionary, nameOfDict, path2Dataset=dataset_dir, nObjects=len(data_dict))
+        return data_dict
 
 if __name__ == "__main__":
     start_time = time.time()
@@ -180,7 +209,7 @@ if __name__ == "__main__":
     datasets = TorchGeometricDatasets()
 
     nameDataset = 'QM9'
-    datasets.download_dataset(nameDataset)
+    data_dict_qm9 = datasets.download_dataset(nameDataset)
 
     end_time = time.time()
     elapsed_time = end_time - start_time
