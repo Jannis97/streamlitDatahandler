@@ -8,52 +8,69 @@ import json
 import torch
 import networkx as nx
 import matplotlib.pyplot as plt
+import os
+import importlib
+from graphviz import Digraph
+
+class TreeNode:
+    def __init__(self, name, value=None):
+        self.name = name
+        self.value = value
+        self.children = []
+
+    def add_child(self, child):
+        self.children.append(child)
+
+    def __repr__(self, level=0):
+        ret = "\t" * level + repr(self.name) + ": " + repr(self.value) + "\n"
+        for child in self.children:
+            ret += child.__repr__(level + 1)
+        return ret
+
+class ObjectTree:
+    def __init__(self, obj, name="root"):
+        self.root = TreeNode(name)
+        self._build_tree(obj, self.root)
+
+    def _build_tree(self, obj, tree_node):
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                child_node = TreeNode(key)
+                tree_node.add_child(child_node)
+                self._build_tree(value, child_node)
+        elif isinstance(obj, list):
+            for index, item in enumerate(obj):
+                child_node = TreeNode(f"index_{index}")
+                tree_node.add_child(child_node)
+                self._build_tree(item, child_node)
+        else:
+            tree_node.value = obj
+
+    def __repr__(self):
+        return repr(self.root)
+
+    def plot(self, filename="object_tree"):
+        dot = Digraph()
+        self._add_nodes(dot, self.root)
+        dot.render(filename, format='png', view=True)
+
+    def _add_nodes(self, dot, node, parent_id=None):
+        node_id = str(id(node))
+        label = f"{node.name}: {node.value}" if node.value is not None else node.name
+        dot.node(node_id, label)
+        if parent_id:
+            dot.edge(parent_id, node_id)
+        for child in node.children:
+            self._add_nodes(dot, child, node_id)
 class DictVisualization:
-    def __init__(self):
-        pass
-
-    def dict_to_graph(self, dictionary, nameOfDict='', G=None, parent_key=None):
-        if G is None:
-            G = nx.DiGraph()
-            parent_key = nameOfDict
-            G.add_node(parent_key)  # Füge die Wurzel als ersten Knoten hinzu
-        for key, value in dictionary.items():
-            if key is not None and value is not None:
-                current_key = f"{parent_key}.{key}" if parent_key else key
-                if isinstance(value, dict):
-                    G.add_node(current_key)
-                    G.add_edge(parent_key, current_key)  # Kante von der Wurzel zum aktuellen Knoten hinzufügen
-                    G = self.dict_to_graph(value, nameOfDict, G, current_key)
-                elif isinstance(value, list):
-                    G.add_node(current_key)
-                    for i, v in enumerate(value):
-                        G.add_node(f"{current_key}[{i}]")
-                        G.add_edge(current_key, f"{current_key}[{i}]")
-                else:
-                    G.add_node(current_key)
-                    G.add_edge(parent_key, current_key)
-                    valueType = type(value).__name__
-                    valueDtype = value.dtype if isinstance(value, torch.Tensor) else None
-
-                    G.nodes[current_key]['value'] = f"valueType:({valueType}), valueDtype:({valueDtype})"
-
-        # Layout für den Graphen festlegen
-        pos = nx.spring_layout(G, seed=42)
-        # Vertikale Ausrichtung der Knoten anpassen
-        pos_labels = {node: (pos[node][0], pos[node][1] * -1) for node in G.nodes()}
-
-        # Graph anzeigen
-        plt.figure(figsize=(10, 6))
-        nx.draw(G, pos_labels, with_labels=True, node_size=2000, node_color='skyblue', font_size=10, font_weight='bold', verticalalignment='bottom')
-        plt.title(f'Graph des {nameOfDict} Beispiel-Daten-Dictionary (Baumdarstellung)')
-        plt.show()
-
+    def dict_to_graph(self, dictionary, name, G=None, parent_key=None):
+        tree = ObjectTree(dictionary, name)
+        tree.plot(name)
 
 
 class TorchGeometricDatasets:
     def __init__(self):
         self.base_dir = os.path.join(os.getcwd(), 'datasets')
-
         self.DictVisulizer = DictVisualization()
 
     def _create_dataset_dir(self, name):
@@ -75,7 +92,7 @@ class TorchGeometricDatasets:
         return data_dict
 
     def download_QM7b(self):
-        nameOfDict = 'QM7b'
+        nameOfDict = 'QM9'
         dataset_dir = self._create_dataset_dir(nameOfDict)
 
         dataset_dir = os.path.join(os.getcwd(), 'datasets', nameOfDict)
@@ -95,7 +112,7 @@ class TorchGeometricDatasets:
 
         key = list(data_dict.keys())[0]
         dictionary = data_dict[key]
-        self.DictVisulizer.dict_to_graph(dictionary,nameOfDict, G=None, parent_key=None)
+        self.DictVisulizer.dict_to_graph(dictionary, nameOfDict)
         a = 1
     def download_QM9(self):
         dataset_dir = self._create_dataset_dir('QM9')

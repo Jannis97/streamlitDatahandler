@@ -156,3 +156,5 @@ tourchGometricDatasets/datasets/HydroNet/raw/
 *.index
 
 *.png
+
+tourchGometricDatasets/
