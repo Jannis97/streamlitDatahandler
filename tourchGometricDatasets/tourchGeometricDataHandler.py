@@ -4,8 +4,12 @@ import torch
 from tqdm import tqdm
 import time
 from graphviz import Digraph
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from rdkit import Chem
+from rdkit import RDLogger
+import sqlite3
+
+# Deactivate RDKit warnings
+RDLogger.DisableLog('rdApp.*')
 
 class TreeNode:
     def __init__(self, name, value=None, shape=None, dtype=None):
@@ -90,6 +94,9 @@ class ObjectTree:
         with open(f"{filename}.txt", "w") as file:
             file.write(self.__repr__())
 
+
+
+
 class DictVisualization:
     def dict_to_graph(self, dictionary, name, path2Dataset=None, nObjects=None):
         print("Funktion: DictVisualization.dict_to_graph")
@@ -97,6 +104,7 @@ class DictVisualization:
         nameTreeDir = os.path.join(path2Dataset, 'tree')
         os.makedirs(nameTreeDir, exist_ok=True)
         tree.plot(name, nameTreeDir)
+
 
 class TorchGeometricDatasets:
     def __init__(self):
@@ -124,31 +132,32 @@ class TorchGeometricDatasets:
                     else:
                         sample_dict[key] = "Invalid SMILES"
                 except Exception as e:
-                    sample_dict[key] = f"Error: {e}"
+                    print(f"Error processing SMILES: {e}")
+                    print(f"Sample index: {index}")
+                    print(f"Sample SMILES: {value}")
+                    print(f"canonical_smiles: {canonical_smiles}")
+                    if 'Explicit valence' in str(e):
+                        sample_dict[key] = "Invalid SMILES"
+                    else:
+                        sample_dict[key] = f"Error: {e}"
             else:
                 sample_dict[key] = value
+
+
         return index, sample_dict
 
-    def dataset_to_dict(self, dataset, use_multithreading=True):
+    def dataset_to_dict(self, dataset):
         print("Funktion: TorchGeometricDatasets.dataset_to_dict")
         data_dict = {}
         num_samples = len(dataset)
 
-        if use_multithreading:
-            num_workers = min(32, num_samples)  # You can adjust the number of threads as needed
-            with ThreadPoolExecutor(max_workers=num_workers) as executor:
-                futures = {executor.submit(self._process_sample, (i, dataset[i])): i for i in range(num_samples)}
-                for future in tqdm(as_completed(futures), total=num_samples, desc="Converting dataset to dict"):
-                    index, sample_dict = future.result()
-                    data_dict[index] = sample_dict
-        else:
-            for i in tqdm(range(num_samples), desc="Converting dataset to dict"):
-                index, sample_dict = self._process_sample((i, dataset[i]))
-                data_dict[index] = sample_dict
+        for i in tqdm(range(num_samples), desc="Converting dataset to dict"):
+            index, sample_dict = self._process_sample((i, dataset[i]))
+            data_dict[index] = sample_dict
 
         return data_dict
 
-    def download_dataset(self, nameOfDict, use_multithreading=True):
+    def download_dataset(self, nameOfDict):
         print("Funktion: TorchGeometricDatasets.download_dataset")
         dataset_dir = self._create_dataset_dir(nameOfDict)
 
@@ -158,7 +167,7 @@ class TorchGeometricDatasets:
         dataset_module = importlib.import_module('torch_geometric.datasets')
         dataset_class = getattr(dataset_module, nameOfDict)
         dataset = dataset_class(root=dataset_dir)
-        data_dict = self.dataset_to_dict(dataset, use_multithreading)
+        data_dict = self.dataset_to_dict(dataset)
 
         key = list(data_dict.keys())[0]
         dictionary = data_dict[key]
@@ -171,8 +180,7 @@ if __name__ == "__main__":
     datasets = TorchGeometricDatasets()
 
     nameDataset = 'QM9'
-    use_multithreading = True  # Setze auf False, um Multithreading zu deaktivieren
-    datasets.download_dataset(nameDataset, use_multithreading)
+    datasets.download_dataset(nameDataset)
 
     end_time = time.time()
     elapsed_time = end_time - start_time
