@@ -136,3 +136,23 @@ converted_db.sqlite
 *.pt
 
 *.sdf
+
+tourchGometricDatasets/datasets/AQSOL/raw/
+
+tourchGometricDatasets/datasets/HydroNet/processed/
+
+tourchGometricDatasets/datasets/PCQM4Mv2/raw/pcqm4m-v2/.zip
+
+tourchGometricDatasets/datasets/MD17/aspirin/raw/
+
+*.pickle
+
+tourchGometricDatasets/datasets/PCQM4Mv2/raw/pcqm4m-v2/raw/
+
+tourchGometricDatasets/datasets/HydroNet/raw/
+
+*.mat
+
+*.index
+
+*.png
