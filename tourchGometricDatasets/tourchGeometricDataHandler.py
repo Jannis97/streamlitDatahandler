@@ -119,11 +119,15 @@ class TorchGeometricDatasets:
             os.makedirs(dataset_dir)
         return dataset_dir
 
-    def _process_sample(self, index_sample, doPrint=False):
+    def _process_sample(self, index_sample, doPrint=False, showWarnings=False):
         index, sample = index_sample
         sample_dict = {}
         failed = False
         oldSmile = None
+
+        if not showWarnings:
+            RDLogger.DisableLog('rdApp.*')
+
         for key, value in sample.items():
             if key == 'smiles':  # Assume the key for SMILES is 'smiles'
                 try:
@@ -169,8 +173,13 @@ class TorchGeometricDatasets:
         nFail = 0
         smilesSuccess = []
         smilesFail = []
+        doPrint = False
+        showWarnings = False
+
+        if not showWarnings:
+            print("Warnings are disabled")
         for i in tqdm(range(num_samples), desc="Converting dataset to dict"):
-            index, sample_dict, failed, oldSmile= self._process_sample((i, dataset[i]))
+            index, sample_dict, failed, oldSmile= self._process_sample((i, dataset[i]), doPrint, showWarnings)
             data_dict[index] = sample_dict
 
             if failed:
@@ -208,8 +217,11 @@ if __name__ == "__main__":
     # Beispiel für die Verwendung der Klasse
     datasets = TorchGeometricDatasets()
 
-    nameDataset = 'QM9'
-    data_dict_qm9 = datasets.download_dataset(nameDataset)
+    for nameDataset in tqdm(['QM9', 'ZINC', 'AQSOL', 'MoleculeNet', 'PCQM4Mv2', 'HydroNet']):
+        print('nameDataset', nameDataset)
+        data_dict = datasets.download_dataset(nameDataset)
+
+        data_dict_qm9 = datasets.download_dataset(nameDataset)
 
     end_time = time.time()
     elapsed_time = end_time - start_time
