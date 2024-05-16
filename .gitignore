@@ -132,3 +132,7 @@ dmypy.json
 *.iml
 
 converted_db.sqlite
+
+*.pt
+
+*.sdf
